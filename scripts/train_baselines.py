@@ -44,6 +44,12 @@ def parse_args():
         help="Primary selection metric for baseline ranking (default: recall).",
     )
     parser.add_argument(
+        "--data-path",
+        type=str,
+        default="data/processed/clean_network_flows.parquet",
+        help="Path to preprocessed clean parquet dataset.",
+    )
+    parser.add_argument(
         "--raw-data-dir",
         type=str,
         default="data/raw",
@@ -64,20 +70,25 @@ def main():
     print("NETSENTRY v2: BASELINE MODEL TRAINING TOURNAMENT")
     print("=" * 60)
 
-    # 1. Discover raw capture files
-    raw_dir = Path(args.raw_data_dir)
-    raw_csvs = list(raw_dir.glob("*.csv"))
-    if not raw_csvs:
-        print(f"Error: No raw CSV files found in {raw_dir}")
-        sys.exit(1)
-
-    print(f"Found {len(raw_csvs)} raw flow capture files.")
-
-    # 2. Ingest and Clean
-    pipeline_res = run_data_pipeline(raw_csvs)
-    clean_parquet_path = pipeline_res["output_path"]
     import polars as pl
-    clean_df = pl.read_parquet(clean_parquet_path)
+    import os
+
+    parquet_file = Path(args.data_path)
+    if parquet_file.exists():
+        print(f"Loading cleaned dataset directly from {parquet_file}...")
+        clean_df = pl.read_parquet(parquet_file)
+    else:
+        # 1. Discover raw capture files
+        raw_dir = Path(args.raw_data_dir)
+        raw_csvs = list(raw_dir.glob("*.csv"))
+        if not raw_csvs:
+            print(f"Error: Neither {parquet_file} nor raw CSV files found in {raw_dir}")
+            sys.exit(1)
+
+        print(f"Found {len(raw_csvs)} raw flow capture files.")
+        pipeline_res = run_data_pipeline(raw_csvs)
+        clean_df = pl.read_parquet(pipeline_res["output_path"])
+
     if args.sample_frac is not None and 0.0 < args.sample_frac < 1.0:
         clean_df = clean_df.sample(fraction=args.sample_frac, seed=42)
         print(f"Sampled {len(clean_df)} rows ({args.sample_frac * 100:.1f}%) for fast tournament.")
@@ -91,9 +102,10 @@ def main():
     splits = get_stratified_splits(feature_df)
 
     # 5. Execute Tournament via BaselineOrchestrator
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlruns.db")
     tracker = MLflowTracker(
         experiment_name="netsentry-baseline-tournament",
-        tracking_uri="sqlite:///mlruns.db",
+        tracking_uri=tracking_uri,
         enabled=True,
     )
 

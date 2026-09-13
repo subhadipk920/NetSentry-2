@@ -20,6 +20,13 @@ class MLflowTracker:
         self.enabled = enabled
 
         if self.enabled and self.tracking_uri:
+            import os
+            if os.getenv("DAGSHUB_USER_TOKEN"):
+                try:
+                    import dagshub
+                    dagshub.init(repo_owner="dipk6545", repo_name="NetSentry-2", mlflow=True)
+                except Exception as e:
+                    print(f"Warning: dagshub.init failed ({e}), continuing with tracking_uri")
             mlflow.set_tracking_uri(self.tracking_uri)
             try:
                 mlflow.set_experiment(self.experiment_name)

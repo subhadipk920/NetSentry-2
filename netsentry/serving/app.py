@@ -11,6 +11,9 @@ from typing import Optional
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from netsentry.serving.config import ServingConfig, load_serving_config
 from netsentry.serving.dependencies import get_predictor
 from netsentry.serving.health import router as health_router

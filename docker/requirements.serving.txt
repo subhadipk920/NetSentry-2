@@ -1,0 +1,23 @@
+﻿# Core Serving & API Gateway
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+httpx>=0.27.0
+pydantic>=2.6.0
+python-dotenv>=1.0.0
+
+# Numerical & Data Processing
+polars>=0.20.0
+numpy>=1.24.0
+pyarrow>=14.0.0
+pandas>=2.0.0
+
+# MLflow Tracking & Cloud Storage Model Loading
+mlflow>=2.10.0
+psycopg2-binary>=2.9.9
+boto3>=1.34.0
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+lightgbm>=4.0.0
+
+# Model serialization
+skops>=0.9.0

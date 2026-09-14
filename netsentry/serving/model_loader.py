@@ -1,4 +1,4 @@
-﻿"""
+"""
 Champion Model Loader (`netsentry.serving.model_loader`).
 ---------------------------------------------------------
 Loads the active @champion model pipeline and its bound decision threshold
@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 import mlflow
 from netsentry.registry.client import RegistryClient
-from netsentry.serving.config import ServingConfig
+from netsentry.serving.config import ServingConfig, load_serving_config
 
 
 @dataclass(frozen=True)
@@ -26,7 +26,7 @@ class ModelLoader:
     """Loads and caches the current champion model and threshold from MLflow."""
 
     def __init__(self, config: Optional[ServingConfig] = None, client: Optional[RegistryClient] = None):
-        self.config = config or ServingConfig()
+        self.config = config or load_serving_config()
         self.client = client or RegistryClient(tracking_uri=self.config.tracking_uri)
         self._champion_model: Optional[ChampionModel] = None
 

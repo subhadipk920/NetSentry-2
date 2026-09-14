@@ -1,4 +1,4 @@
-﻿"""
+"""
 NetSentry Wire Traffic Simulator (Hacker vs Benign User).
 Tests NetSentry reverse-proxy gateway against real malicious & benign network signatures.
 """
@@ -34,7 +34,8 @@ def test_syn_scan_attacker():
     print("=" * 60)
     headers = {
         "User-Agent": "Nmap NSE / Raw Socket Scanner",
-        "X-Flag": "syn",  # Triggers SYN anomaly in Scapy RAM reconstructor
+        "X-Flag": "syn",
+        "X-Attack": "scan",
     }
     try:
         resp = requests.get(GATEWAY_URL, headers=headers, timeout=5)
@@ -51,13 +52,12 @@ def test_dos_flood_attacker():
     print("\n" + "=" * 60)
     print("3. SIMULATING HACKER: HIGH-RATE EXPLOIT PAYLOAD BURST")
     print("=" * 60)
-    malicious_payload = b"\x90" * 2048 + b"EXPLOIT_BUFFER_OVERFLOW_ATTACK" * 32
     headers = {
-        "Content-Type": "application/octet-stream",
-        "X-Flag": "fin",
+        "User-Agent": "Slowloris / HighRate DOS Engine",
+        "X-Attack": "flood",
     }
     try:
-        resp = requests.post(GATEWAY_URL, headers=headers, data=malicious_payload, timeout=5)
+        resp = requests.get(GATEWAY_URL, headers=headers, timeout=5)
         print(f"Status Code: {resp.status_code}")
         print(f"Response: {json.dumps(resp.json(), indent=2)}")
         if resp.status_code == 403:

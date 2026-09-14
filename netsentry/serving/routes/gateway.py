@@ -25,19 +25,42 @@ def build_live_packets_in_ram(request: Request, body_bytes: bytes, duration_us: 
     dst_port = int(request.url.port or (443 if request.url.scheme == "https" else 80))
     now = time.time()
 
-    # Determine TCP flags from incoming wire request
-    tcp_flags = "PA"  # Standard HTTP PUSH + ACK
-    if "syn" in request.headers.get("x-flag", "").lower():
+    # Determine TCP flags and attack characteristics from incoming wire request
+    flag_header = request.headers.get("x-flag", "").lower()
+    attack_type = request.headers.get("x-attack", "").lower()
+
+    tcp_flags = "PA"
+    if "syn" in flag_header:
         tcp_flags = "S"
-    elif "fin" in request.headers.get("x-flag", "").lower():
+    elif "fin" in flag_header:
         tcp_flags = "FA"
+
+    packets = []
+    
+    # DoS / Flooding signature: High packet count, tight inter-arrival times
+    if "dos" in attack_type or "flood" in attack_type:
+        burst_count = 20
+        delta_t = duration_us / (burst_count * 1e6)
+        for i in range(burst_count):
+            pkt = IP(src=client_ip, dst="127.0.0.1") / TCP(sport=50000 + i, dport=dst_port, flags="PA") / Raw(load=body_bytes[:64] if body_bytes else b"FLOOD")
+            pkt.time = now - (duration_us / 1e6) + (i * delta_t)
+            packets.append(pkt)
+        return packets
+
+    # PortScan / Reconnaissance signature: Bare SYN packets with zero window
+    if "scan" in attack_type or tcp_flags == "S":
+        for i in range(5):
+            pkt = IP(src=client_ip, dst="127.0.0.1") / TCP(sport=40000 + i, dport=dst_port + i, flags="S", window=0)
+            pkt.time = now - (duration_us / 1e6) + (i * 1e-4)
+            packets.append(pkt)
+        return packets
 
     # Packet 1: Initial transport segment
     pkt1 = IP(src=client_ip, dst="127.0.0.1") / TCP(sport=54321, dport=dst_port, flags=tcp_flags)
     pkt1.time = now - (duration_us / 1e6)
+    packets.append(pkt1)
 
     # Packet 2: Data payload segment (if body exists)
-    packets = [pkt1]
     if body_bytes:
         pkt2 = IP(src=client_ip, dst="127.0.0.1") / TCP(sport=54321, dport=dst_port, flags="PA") / Raw(load=body_bytes)
         pkt2.time = now

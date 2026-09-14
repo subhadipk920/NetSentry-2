@@ -21,7 +21,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/dipk6545/NetSentry.git
           git fetch upstream main
-          git checkout upstream/main -- netsentry/ configs/ docker/ scripts/ tests/ dags/ pyproject.toml
+          git checkout upstream/main -- netsentry/ configs/ docker/ scripts/ tests/ dags/ pyproject.toml .github/workflows/cloud-retraining.yml
           if ! git diff --staged --quiet; then
             git commit -m "chore(sync): pubsub auto-sync from dipk6545/NetSentry"
             git push origin main

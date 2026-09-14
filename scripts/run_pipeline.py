@@ -124,6 +124,16 @@ def main():
 
     project_root = Path(__file__).resolve().parent.parent
 
+    # Setup execution log capture file
+    import datetime
+    log_dir = project_root / "artifacts" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"pipeline_run_{timestamp_str}.log"
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+    logging.getLogger().addHandler(file_handler)
+
     # 1. Initialize Tracker
     tracker = MLflowTracker(
         experiment_name=args.experiment_name,
@@ -430,6 +440,18 @@ def main():
         logger.info(f"Is New Champion:        {lifecycle_result.is_new_champion}")
         logger.info("=" * 60)
         logger.info("Pipeline execution completed successfully.")
+
+        # Flush and upload execution log to Cloudflare R2 and MLflow
+        if log_file.exists():
+            file_handler.flush()
+            tracker.log_artifact(local_path=str(log_file), artifact_path="logs")
+            try:
+                from netsentry.data.storage import upload_file_to_r2
+                r2_log_path = f"logs/{log_file.name}"
+                upload_file_to_r2(local_path=str(log_file), r2_path=r2_log_path)
+                logger.info(f"Execution log uploaded to Cloudflare R2: {r2_log_path}")
+            except Exception as e:
+                logger.warning(f"Could not upload log to R2: {e}")
 
 
 if __name__ == "__main__":

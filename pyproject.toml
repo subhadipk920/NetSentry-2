@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "netsentry"
-version = "0.2.0"
+version = "0.2.0" # Test PubSub Auto-Sync Pass 2
 description = "Production MLOps Network Intrusion Detection System"
 readme = "README.md"
 requires-python = ">=3.10"

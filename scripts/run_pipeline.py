@@ -116,7 +116,9 @@ def main():
     parser.add_argument("--skip-tuning", action="store_true", help="Skip Optuna HPO and train baseline directly")
     parser.add_argument("--force-tuning", action="store_true", help="Force Optuna HPO even if no drift is detected")
     parser.add_argument("--drift-threshold", type=float, default=0.20, help="Fraction of drifted features triggering emergency HPO (default: 0.20)")
-    parser.add_argument("--tracking-uri", type=str, default="sqlite:///mlruns.db", help="MLflow tracking URI")
+    import os
+    default_tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlruns.db")
+    parser.add_argument("--tracking-uri", type=str, default=default_tracking_uri, help="MLflow tracking URI")
     parser.add_argument("--experiment-name", type=str, default="netsentry-production-pipeline", help="MLflow experiment")
     args = parser.parse_args()
 
@@ -394,8 +396,10 @@ def main():
         # 6. Lifecycle Management & Promotion
         logger.info("Step 4/6: Registry & Champion Promotion...")
         registry_config_file = project_root / "configs" / "registry" / "promotion.yaml"
+        from netsentry.registry.client import RegistryClient
         lifecycle = ModelLifecycleManager(
             config=str(registry_config_file) if registry_config_file.exists() else None,
+            registry_client=RegistryClient(tracking_uri=tracker.tracking_uri),
             tracker=tracker,
         )
 

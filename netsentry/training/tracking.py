@@ -20,19 +20,27 @@ class MLflowTracker:
         self.enabled = enabled
 
         if self.enabled and self.tracking_uri:
+            import os
             mlflow.set_tracking_uri(self.tracking_uri)
+            
+            # Use R2 as default artifact root if R2 credentials exist
+            bucket = os.getenv("R2_BUCKET_NAME", "netsentry")
+            artifact_location = f"s3://{bucket}/mlflow-artifacts" if os.getenv("MLFLOW_S3_ENDPOINT_URL") else None
+
+            from mlflow.tracking import MlflowClient
+            client = MlflowClient(self.tracking_uri)
             try:
+                exp = client.get_experiment_by_name(self.experiment_name)
+                if exp is None:
+                    client.create_experiment(name=self.experiment_name, artifact_location=artifact_location)
+                elif exp.lifecycle_stage == "deleted":
+                    client.restore_experiment(exp.experiment_id)
                 mlflow.set_experiment(self.experiment_name)
             except Exception as e:
-                if "Cannot set a deleted experiment" in str(e):
-                    from mlflow.tracking import MlflowClient
-                    client = MlflowClient(self.tracking_uri)
-                    exp = client.get_experiment_by_name(self.experiment_name)
-                    if exp:
-                        client.restore_experiment(exp.experiment_id)
-                        mlflow.set_experiment(self.experiment_name)
-                else:
-                    raise
+                try:
+                    mlflow.set_experiment(self.experiment_name)
+                except Exception:
+                    raise e
 
     @contextmanager
     def start_run(self, run_name: Optional[str] = None) -> Generator[Optional[str], None, None]:

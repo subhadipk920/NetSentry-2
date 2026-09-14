@@ -19,8 +19,18 @@ class MLflowTracker:
         self.tracking_uri = tracking_uri
         self.enabled = enabled
 
+        import os
+        # Map Cloudflare R2 credentials to standard AWS/Boto3 environment variables
+        if os.getenv("R2_ACCESS_KEY_ID") and not os.getenv("AWS_ACCESS_KEY_ID"):
+            os.environ["AWS_ACCESS_KEY_ID"] = os.getenv("R2_ACCESS_KEY_ID")
+        if os.getenv("R2_SECRET_ACCESS_KEY") and not os.getenv("AWS_SECRET_ACCESS_KEY"):
+            os.environ["AWS_SECRET_ACCESS_KEY"] = os.getenv("R2_SECRET_ACCESS_KEY")
+        if os.getenv("R2_ENDPOINT_URL") and not os.getenv("MLFLOW_S3_ENDPOINT_URL"):
+            os.environ["MLFLOW_S3_ENDPOINT_URL"] = os.getenv("R2_ENDPOINT_URL")
+        if os.getenv("R2_ENDPOINT_URL") and not os.getenv("AWS_ENDPOINT_URL"):
+            os.environ["AWS_ENDPOINT_URL"] = os.getenv("R2_ENDPOINT_URL")
+
         if self.enabled and self.tracking_uri:
-            import os
             mlflow.set_tracking_uri(self.tracking_uri)
             
             # Use R2 as default artifact root if R2 credentials exist

@@ -8,7 +8,7 @@ and exposes the hot-reload endpoint.
 from contextlib import asynccontextmanager
 import logging
 from typing import Optional
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from dotenv import load_dotenv
@@ -20,6 +20,7 @@ from netsentry.serving.health import router as health_router
 from netsentry.serving.model_loader import ModelLoader
 from netsentry.serving.predictor import Predictor
 from netsentry.serving.schemas import PredictionRequest, PredictionResponse
+from netsentry.serving.security_logger import log_security_event
 
 logger = logging.getLogger("NetSentryServing")
 
@@ -70,10 +71,29 @@ def create_app(config: Optional[ServingConfig] = None, model_loader: Optional[Mo
     @app.post("/v2/predict", response_model=PredictionResponse, tags=["Prediction"])
     async def predict(
         request: PredictionRequest,
+        raw_req: Request,
+        background_tasks: BackgroundTasks,
         predictor: Predictor = Depends(get_predictor),
     ) -> PredictionResponse:
         try:
             pred, prob = predictor.predict(request.features)
+            client_ip = raw_req.client.host if raw_req.client else "127.0.0.1"
+            event_type = "REST_API_ATTACK" if pred == 1 else "REST_API_BENIGN"
+            background_tasks.add_task(
+                log_security_event,
+                client_ip=client_ip,
+                event_type=event_type,
+                status_code=200,
+                threat_probability=prob,
+                is_attack=pred,
+                user_agent=raw_req.headers.get("user-agent", "unknown"),
+                headers=dict(raw_req.headers),
+                flow_metrics={
+                    "Destination_Port": request.features.get("Destination_Port"),
+                    "Flow_Duration": request.features.get("Flow_Duration"),
+                    "Total_Fwd_Packets": request.features.get("Total_Fwd_Packets"),
+                },
+            )
             return PredictionResponse(
                 prediction=pred,
                 probability=prob,

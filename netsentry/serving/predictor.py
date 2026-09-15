@@ -40,29 +40,45 @@ class Predictor:
         self.champion = champion_model
 
     def _prepare_matrix(self, features: Union[Dict[str, float], pl.DataFrame, np.ndarray]) -> np.ndarray:
-        """Ensures 64 clean base features or 71 full features are converted into aligned 71-feature matrix."""
+        """Ensures incoming feature sets are strictly aligned to the exact 71-feature training schema."""
         if isinstance(features, dict):
             feat_dict = dict(features)
+            # Guarantee Protocol exists (default TCP = 6.0)
+            if "Protocol" not in feat_dict:
+                feat_dict["Protocol"] = 6.0
+
             df = pl.DataFrame([feat_dict])
             # Auto-compute 7 engineered features if not already present
             if "Flow_Packet_Density" not in feat_dict:
                 df = engineer_network_features(df)
 
-            # Reorder columns to guarantee exact match with model training schema
-            available_cols = [c for c in EXPECTED_FEATURE_ORDER if c in df.columns]
-            if len(available_cols) == len(EXPECTED_FEATURE_ORDER):
-                X = df.select(EXPECTED_FEATURE_ORDER).to_numpy()
-            else:
-                X = df.to_numpy()
+            # Pad any missing columns from EXPECTED_FEATURE_ORDER with 0.0
+            for col in EXPECTED_FEATURE_ORDER:
+                if col not in df.columns:
+                    df = df.with_columns(pl.lit(0.0).alias(col))
+
+            # Strictly select ONLY the 71 expected features in exact canonical order
+            X = df.select(EXPECTED_FEATURE_ORDER).to_numpy()
+
         elif isinstance(features, pl.DataFrame):
             df = features
+            if "Protocol" not in df.columns:
+                df = df.with_columns(pl.lit(6.0).alias("Protocol"))
             if "Flow_Packet_Density" not in df.columns:
                 df = engineer_network_features(df)
-            X = df.to_numpy()
+            for col in EXPECTED_FEATURE_ORDER:
+                if col not in df.columns:
+                    df = df.with_columns(pl.lit(0.0).alias(col))
+            X = df.select(EXPECTED_FEATURE_ORDER).to_numpy()
+
         else:
             X = np.asarray(features)
             if X.ndim == 1:
                 X = X.reshape(1, -1)
+            # If shape is greater than 71, take first 71
+            if X.shape[1] > len(EXPECTED_FEATURE_ORDER):
+                X = X[:, :len(EXPECTED_FEATURE_ORDER)]
+
         return X
 
     def predict(self, features: Union[Dict[str, float], pl.DataFrame, np.ndarray]) -> Tuple[int, float]:

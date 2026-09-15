@@ -1,37 +1,30 @@
 x-airflow-common: &airflow-common
   image: apache/airflow:2.8.1-python3.10
+  env_file:
+    - ../.env
   environment:
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW_DATABASE_CONN}
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE=1
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW=1
+    - AIRFLOW__WEBSERVER__WORKERS=1
     - AIRFLOW__CORE__FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqJZPo=
     - AIRFLOW__WEBSERVER__SECRET_KEY=netsentry_airflow_secret_key_prod_2026!
     - AIRFLOW__CORE__LOAD_EXAMPLES=False
     - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
     - NETSENTRY_HOST_DIR=${NETSENTRY_HOST_DIR:-D:/ML End to End Projects/Made with ML/NetSentry v2}
-    - MLFLOW_TRACKING_URI
+    - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+    - R2_BUCKET_NAME=${R2_BUCKET_NAME}
+    - R2_ENDPOINT_URL=${R2_ENDPOINT_URL}
+    - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+    - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
   volumes:
     - ../dags:/opt/airflow/dags
     - ../artifacts:/opt/airflow/artifacts
     - airflow-logs:/opt/airflow/logs
     - //var/run/docker.sock:/var/run/docker.sock
-  depends_on:
-    postgres:
-      condition: service_healthy
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=airflow
-      - POSTGRES_PASSWORD=airflow
-      - POSTGRES_DB=airflow
-    volumes:
-      - airflow-postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U airflow"]
-      interval: 5s
-      retries: 5
-
   airflow-init:
     <<: *airflow-common
     command: version
@@ -45,8 +38,8 @@ services:
           --firstname Admin \
           --lastname User \
           --role Admin \
-          --email admin@example.com \
-          --password admin
+          --email admin@netsentry.io \
+          --password admin || true
 
   airflow-webserver:
     <<: *airflow-common
@@ -67,5 +60,4 @@ services:
         condition: service_completed_successfully
 
 volumes:
-  airflow-postgres-data:
   airflow-logs:

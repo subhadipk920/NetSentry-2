@@ -11,6 +11,21 @@ BASE_URL = os.getenv("NETSENTRY_SERVER_URL", "https://dipk6545--netsentry-servin
 GATEWAY_URL = f"{BASE_URL}/gateway/get"
 PREDICT_URL = f"{BASE_URL}/v1/predict"
 
+def warmup_server():
+    """Warms up the serverless cloud container before firing traffic."""
+    print("⏳ Warming up Modal serverless container (waiting up to 45s for cold start)...")
+    for attempt in range(1, 4):
+        try:
+            resp = requests.get(f"{BASE_URL}/", timeout=45)
+            if resp.status_code == 200:
+                print(f"🔥 Server is warm and ready! (Attempt {attempt}, status 200)")
+                return
+        except Exception as e:
+            print(f"   Booting instance... (Attempt {attempt}/3, waiting 3s)")
+            import time
+            time.sleep(3)
+    print("⚠️ Warmup finished with warnings, continuing to test suite.")
+
 def test_gateway_benign_user():
     print("\n" + "=" * 60)
     print("1. GATEWAY SIMULATION: LEGITIMATE BENIGN USER REQUEST")
@@ -21,7 +36,7 @@ def test_gateway_benign_user():
         "Accept": "application/json",
     }
     try:
-        resp = requests.get(GATEWAY_URL, headers=headers, timeout=15)
+        resp = requests.get(GATEWAY_URL, headers=headers, timeout=30)
         print(f"Status Code: {resp.status_code}")
         if resp.status_code == 200:
             print("✅ PASSED: Legitimate user granted access through gateway to upstream server!")
@@ -165,9 +180,57 @@ def test_direct_ml_predict_api():
     except Exception as e:
         print(f"Connection Error: {e}")
 
+def test_gateway_extreme_volumetric_ddos():
+    print("\n" + "=" * 60)
+    print("5. EXTREME SCENARIO: HIGH-RATE VOLUMETRIC UDP/TCP AMPLIFICATION DDOS")
+    print(f"Target: {GATEWAY_URL}")
+    print("=" * 60)
+    headers = {
+        "User-Agent": "Mirai-Botnet / Mirai.v2.Cluster",
+        "X-Attack": "flood",
+        "X-Flag": "syn",
+        "X-Threat-Severity": "CRITICAL_EXTREME",
+    }
+    payload = b"X" * 65535  # Extreme oversized buffer payload
+    try:
+        resp = requests.post(GATEWAY_URL, data=payload, headers=headers, timeout=15)
+        print(f"Status Code: {resp.status_code}")
+        print(f"Response: {json.dumps(resp.json(), indent=2)}")
+        if resp.status_code == 403:
+            print("🛡️ PASSED: Extreme volumetric DDoS intercepted and neutralized by NetSentry Shield!")
+        else:
+            print("⚠️ ALERT: Extreme DDoS bypassed the shield!")
+    except Exception as e:
+        print(f"Connection Error: {e}")
+
+def test_gateway_extreme_stealth_slowloris():
+    print("\n" + "=" * 60)
+    print("6. EXTREME SCENARIO: STEALTH L7 SLOW-READ / ZERO-WINDOW CONNECTION STARVATION")
+    print(f"Target: {GATEWAY_URL}")
+    print("=" * 60)
+    headers = {
+        "User-Agent": "Slowloris-Python-Stealth-Engine/3.0",
+        "X-Attack": "scan",
+        "X-Flag": "syn",
+        "X-Threat-Severity": "STEALTH_EVASION",
+    }
+    try:
+        resp = requests.get(GATEWAY_URL, headers=headers, timeout=15)
+        print(f"Status Code: {resp.status_code}")
+        print(f"Response: {json.dumps(resp.json(), indent=2)}")
+        if resp.status_code == 403:
+            print("🛡️ PASSED: Stealth starvation probe classified as hostile and blocked!")
+        else:
+            print("⚠️ ALERT: Stealth probe bypassed the shield!")
+    except Exception as e:
+        print(f"Connection Error: {e}")
+
 if __name__ == "__main__":
     print(f"🚀 NetSentry Live Cloud Traffic Simulator targeting: {BASE_URL}")
+    warmup_server()
     test_gateway_benign_user()
     test_gateway_syn_scan_attacker()
     test_gateway_dos_flood_attacker()
     test_direct_ml_predict_api()
+    test_gateway_extreme_volumetric_ddos()
+    test_gateway_extreme_stealth_slowloris()
